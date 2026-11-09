@@ -266,9 +266,19 @@ class Requirement:
             return cls.parse_editable(
                 re.sub(r'^(-e|--editable=?)\s*', '', line))
 
+        # Extract any --hash=... options before the line is truncated: pip
+        # allows a requirement to carry several of them, on the same line or
+        # on continuation lines already joined by the parser.
+        hashes = re.findall(r'--hash=([^\s]+)', line)
+
         if ' --hash=' in line:
             line = line[:line.find(' --hash=')]
         if ' \\' in line:
             line = line[:line.find(' \\')]
 
-        return cls.parse_line(line)
+        req = cls.parse_line(line)
+        if hashes and ':' in hashes[0] and req.hash_name is None:
+            # Keep the documented single members; a line can name several
+            # hashes, in which case the first one is the representative.
+            req.hash_name, req.hash = hashes[0].split(':', 1)
+        return req

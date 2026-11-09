@@ -18,7 +18,7 @@
 
 import os
 import warnings
-from typing import Iterator, TextIO, Union
+from typing import Iterator, List, TextIO, Union
 
 from .requirement import Requirement
 
@@ -54,8 +54,21 @@ def parse(reqstr: Union[str, TextIO]) -> Iterator[Requirement]:
     if not isinstance(reqstr, str):
         reqstr = reqstr.read()
 
-    for line in reqstr.splitlines():
-        line = line.strip()
+    # A line ending with a backslash continues on the next physical line
+    # (pip's requirements file format, e.g. for --hash= options): join
+    # those before the per-line handling below, so the requirement carries
+    # its options no matter which physical line they were written on.
+    logical_lines: List[str] = []
+    for raw_line in reqstr.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if logical_lines and logical_lines[-1].endswith('\\'):
+            logical_lines[-1] = logical_lines[-1][:-1].rstrip() + ' ' + line
+        else:
+            logical_lines.append(line)
+
+    for line in logical_lines:
 
         if line == '':
             continue
